@@ -2,86 +2,106 @@ let Express = require("express");
 let router =Express.Router();
 let validateJWT = require("../middleware/validate-jwt");
 const {ItemModel} = require("../models");
-const Item = require("../models/item");
 
-//const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 //const {UniqueConstraintError} = require("sequelize/lib/errors");
 
 
-exports.index = function(req,res) {
-    res.send("not implemented site home page");
-}
 
+router.post("/create", validateJWT, async(req,res) => {
+    const {itemName, itemDesc, itemQty, itemCat} = req.body.item;
+    const {id} = req.user;
+    const itemEntry = {
+        itemName,
+        itemDesc,
+        itemQty,
+        itemCat,
+        owner: id
+    }
+    try {
+        const newItem = await ItemModel.create(itemEntry);
+        res.status(200).json(newItem);
 
+        let token = jwt.sign({id: User.id}, process.env.JWT_SECRET, {expiresIn: 60*60*24});
+    
+        res.status(201).json({  //add a status code and package the response in json
+            message: "item successfully created",
+            item: Item,
+            sessionToken: token
+        });
+    } catch (err) {
+        res.status(500).json({error: err});
+    }
+    ItemModel.create(itemEntry)
 
-
+});
 
 
 //get all items
-/* router.get("/findAll", async (req,res) => {
+router.get("/", async (req,res) => {
     try{
-        res.send(req.params.id)
-        //const items = await res.json(items);
-        //console.log(items) 
+        const entries = await ItemModel.findAll();
+        res.status(200).json(entries)
+    } catch(err) {
+        res.status(500).json({error: err});
     }
-    catch(err) {
-        res.json({error: err.message || err.toString()});
+});
+
+//get items by category
+router.get("/:itemCat", async (req,res) => {
+    const {itemCat} = req.params;
+
+    try{
+        const results = await ItemModel.findAll({
+            where: { itemCat: itemCat }
+        });
+        res.status(200).json(results);
+    } catch(err) {
+        res.status(500).json({error: err});
     }
 });
 
 
-//add item
-router.post("/add", async (req,res) => {
+//edit item
+router.put("/edit/:itemId", async (req,res) => {
 
-    let {itemName, itemDescription, itemQty, itemCategory} = req.body.user; //dynamic data 
-
-    try{
-        const Item = await ItemModel.create({ //stores value of promise data that returns in the response
-            itemName,
-            itemDescription,
-            itemQty,
-            itemCategory
-        });
+    const {itemName, itemDescription, itemQty, itemCategory} = req.body.item; //dynamic data 
+    const itemId = req.params.itemId;
     
-        res.status(201).json({  //add a status code and package the response in json
-            message: "Item successfully added",
-            item: Item,
-        });
-    } catch (err) {
-        if (error instanceof UniqueConstraintError) {
-            res.status(409).json({
-                message:"Value already in use",
-            });
-        } else {
-            res.status(500).json({
-                message: "Failed to add item"
-            });
-        }
-    }
-}); */
+    const query = {
+        where: { id: itemId }
+    };
 
-/* //edit item
-router.post("/edit", async (req,res) => {
+    const editedItem = {
+        itemName: itemName,
+        itemDescription: itemDescription,
+        itemQty: itemQty,
+        itemCategory: itemCategory
+    };
 
-    let {itemName, itemDescription, itemQty, itemCategory} = req.body.user; //dynamic data 
     try{
-        const ItemEdit = await UserModel.findOne({ 
-            where: {
-                itemName: itemName,
-            },
-        });
-
-        if(ItemEdit){
-            res.status(200).json({
-                item: item,
-                message: "User login successful!",
-                sessionToken: token
-            });
-    } catch (error) {
-        res.status(500).json({
-            message: "Item update failed"
-        })
+        const edit = await ItemModel.update(editedItem, query);
+        res.status(200).json(edit);
+    } catch (err) {
+        res.status(500).json({ error: err });
     }
-}); */
+});
+
+//delete item
+router.delete("/delete/:id", async (req, res) => {
+    const itemId = req.params.id;
+
+    try{
+        const query = {
+            where: {
+                id: itemId
+            }
+        };
+        await ItemModel.destroy(query);
+        res.status(200).json({ message: "Item Removed" });
+    } catch (err){
+        res.status(500).json({error: err});
+    }
+});
 
 module.exports = router;
